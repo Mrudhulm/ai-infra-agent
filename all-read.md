@@ -1,4 +1,15 @@
-Local AI Infrastructure Agent System (Docker Blueprint)A complete microservice architecture, step-by-step build guide, and Docker Compose specification for running a secure infrastructure agent locally connected to your local LLM (Ollama / vLLM / LocalAI).1. High-Level Architecture (Local Microservice Stack)Every component runs in its own isolated Docker container. Your local LLM handles reasoning, while a dedicated Credential Broker and Sandboxed Runner execute infrastructure commands safely.┌────────────────────────────────────────────────────────────────────────────────────────┐
+# Local AI Infrastructure Agent System (Docker Blueprint)
+
+> A complete microservice architecture, step-by-step build guide, and Docker Compose specification for running a secure infrastructure agent locally connected to your local LLM (Ollama / vLLM / LocalAI).
+
+---
+
+## 1. High-Level Architecture (Local Microservice Stack)
+
+Every component runs in its own isolated Docker container. Your local LLM handles reasoning, while a dedicated Credential Broker and Sandboxed Runner execute infrastructure commands safely.
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
 │                                 DOCKER VIRTUAL NETWORK                                 │
 │                                                                                        │
 │  ┌─────────────────┐       ┌─────────────────┐       ┌─────────────────────────────┐   │
@@ -29,7 +40,32 @@ Local AI Infrastructure Agent System (Docker Blueprint)A complete microservice a
 │      └───────────────────────────┘                  └───────────────────────────┘      │
 │                                                                                        │
 └────────────────────────────────────────────────────────────────────────────────────────┘
-2. Microservice Container BreakdownMicroservice ContainerDedicated RoleBase Image / Toolagent-uiUser dashboard to trigger tasks, view diffs, approve actionsNode.js / React / Next.jsapi-gatewayExposes REST APIs, receives webhooks, streams logs via SSEPython FastAPI or Node.js Expresspolicy-engineEvaluates if actions are safe (Observe / Propose / Governed)Open Policy Agent (OPA)task-queueDispatches jobs and manages agent output streamsRedis Streams / BullMQdatabaseStores session history, target repos, and metadataPostgreSQL (with pgvector)agent-workerRuns the agentic inner loop (Prompt -> LLM -> Tool Call)Python (LangChain/PydanticAI) or TScredential-brokerInjects short-lived credentials into execution sandboxesCustom Go / Python Microserviceexecution-sandboxEphemeral execution workspace with security toolsDebian / Ubuntu + terraform, aws-cli, checkovlocal-llmRuns local AI model locally (e.g., qwen2.5-coder, llama3.1)Ollama (ollama/ollama)3. Dedicated Project Directory StructureOrganize your local workspace as a monorepo containing distinct microservices:local-infra-agent/
+```
+
+---
+
+## 2. Microservice Container Breakdown
+
+| Microservice Container | Dedicated Role | Base Image / Tool |
+| :--- | :--- | :--- |
+| `agent-ui` | User dashboard to trigger tasks, view diffs, approve actions | Node.js / React / Next.js |
+| `api-gateway` | Exposes REST APIs, receives webhooks, streams logs via SSE | Python FastAPI or Node.js Express |
+| `policy-engine` | Evaluates if actions are safe (Observe / Propose / Governed) | Open Policy Agent (OPA) |
+| `task-queue` | Dispatches jobs and manages agent output streams | Redis Streams / BullMQ |
+| `database` | Stores session history, target repos, and metadata | PostgreSQL (with pgvector) |
+| `agent-worker` | Runs the agentic inner loop (Prompt -> LLM -> Tool Call) | Python (LangChain/PydanticAI) or TS |
+| `credential-broker` | Injects short-lived credentials into execution sandboxes | Custom Go / Python Microservice |
+| `execution-sandbox` | Ephemeral execution workspace with security tools | Debian / Ubuntu + `terraform`, `aws-cli`, `checkov` |
+| `local-llm` | Runs local AI model locally (e.g., `qwen2.5-coder`, `llama3.1`) | Ollama (`ollama/ollama`) |
+
+---
+
+## 3. Dedicated Project Directory Structure
+
+Organize your local workspace as a monorepo containing distinct microservices:
+
+```text
+local-infra-agent/
 ├── docker-compose.yml
 ├── .env.example
 ├── services/
@@ -58,7 +94,16 @@ Local AI Infrastructure Agent System (Docker Blueprint)A complete microservice a
     ├── postgres-data/
     ├── redis-data/
     └── workspace-repos/
-4. Production-Grade Docker Compose FileSave this file as docker-compose.yml in your project root to run the entire system locally:version: '3.8'
+```
+
+---
+
+## 4. Production-Grade Docker Compose File
+
+Save this file as `docker-compose.yml` in your project root to run the entire system locally:
+
+```yaml
+version: '3.8'
 
 networks:
   agent-net:
@@ -172,7 +217,16 @@ services:
       - policy-engine
     networks:
       - agent-net
-5. End-to-End Workflow Execution SequenceHere is how a request like "Create an S3 bucket with encryption enabled" flows securely through your microservices:[ User Input / Webhook ]
+```
+
+---
+
+## 5. End-to-End Workflow Execution Sequence
+
+Here is how a request like **"Create an S3 bucket with encryption enabled"** flows securely through your microservices:
+
+```
+[ User Input / Webhook ]
            │
            ▼
 1. API Gateway ──────────────► 2. Policy Engine
@@ -202,11 +256,30 @@ services:
                                          ▼ If validation passes (Zero Drift)
                                6. Git Service
                                   (Pushes branch & opens Pull Request for human review)
-6. Step-by-Step Build & Setup GuideStep 1: Clone & Prepare StructureCreate your local folders:mkdir -p local-infra-agent/services/{api-gateway,policy-engine,credential-broker,agent-worker,execution-sandbox}
+```
+
+---
+
+## 6. Step-by-Step Build & Setup Guide
+
+### Step 1: Clone & Prepare Structure
+Create your local folders:
+```bash
+mkdir -p local-infra-agent/services/{api-gateway,policy-engine,credential-broker,agent-worker,execution-sandbox}
 cd local-infra-agent
-Step 2: Download Local LLM ModelStart Ollama and download a coding model optimized for infrastructure (e.g., qwen2.5-coder or llama3.1):docker compose up -d local-llm
+```
+
+### Step 2: Download Local LLM Model
+Start Ollama and download a coding model optimized for infrastructure (e.g., `qwen2.5-coder` or `llama3.1`):
+```bash
+docker compose up -d local-llm
 docker exec -it agent-local-llm ollama pull qwen2.5-coder:7b
-Step 3: Configure OPA Safety RulesCreate services/policy-engine/infra_guardrails.rego:package infra.allow
+```
+
+### Step 3: Configure OPA Safety Rules
+Create `services/policy-engine/infra_guardrails.rego`:
+```rego
+package infra.allow
 
 default allow = false
 
@@ -219,7 +292,12 @@ allow {
 deny {
     input.action == "terraform_apply"
 }
-Step 4: Build Agent Worker LoopIn services/agent-worker/agent.py, configure the OpenAI/LangChain client to point to your local LLM container:import os
+```
+
+### Step 4: Build Agent Worker Loop
+In `services/agent-worker/agent.py`, configure the OpenAI/LangChain client to point to your local LLM container:
+```python
+import os
 from openai import OpenAI
 
 client = OpenAI(
@@ -236,6 +314,17 @@ def generate_iac(prompt: str):
         ]
     )
     return response.choices[0].message.content
-Step 5: Start the Full StackLaunch all dedicated microservices locally:docker compose up --build -d
-Step 6: Verify Stack HealthCheck that all containers are active:docker compose ps
-You can now send POST requests to http://localhost:8000 to trigger your agent, which will generate code using your local LLM and execute sandboxed validation steps locally.
+```
+
+### Step 5: Start the Full Stack
+Launch all dedicated microservices locally:
+```bash
+docker compose up --build -d
+```
+
+### Step 6: Verify Stack Health
+Check that all containers are active:
+```bash
+docker compose ps
+```
+You can now send POST requests to `http://localhost:8000` to trigger your agent, which will generate code using your **local LLM** and execute sandboxed validation steps locally.
